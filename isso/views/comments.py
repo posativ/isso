@@ -14,7 +14,7 @@ from werkzeug.wsgi import get_current_url
 from werkzeug.utils import redirect
 from werkzeug.routing import Rule
 from werkzeug.wrappers import Response
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, Unauthorized
 
 from isso.compat import text_type as str
 
@@ -75,7 +75,7 @@ class API(object):
                   'mode', 'created', 'modified', 'likes', 'dislikes', 'hash'])
 
     # comment fields, that can be submitted
-    ACCEPT = set(['text', 'author', 'website', 'email', 'parent', 'title'])
+    ACCEPT = set(['text', 'author', 'password', 'website', 'email', 'parent', 'title'])
 
     VIEWS = [
         ('fetch',   ('GET', '/')),
@@ -102,6 +102,8 @@ class API(object):
 
         self.conf = isso.conf.section("general")
         self.moderated = isso.conf.getboolean("moderation", "enabled")
+        self.users = list(map(lambda line: tuple(map(str.strip, line.split(','))),
+                isso.conf.getiter("user", "accounts")))
 
         self.guard = isso.db.guard
         self.threads = isso.db.threads
@@ -112,7 +114,7 @@ class API(object):
                 Rule(path, methods=[method], endpoint=getattr(self, view)))
 
     @classmethod
-    def verify(cls, comment):
+    def verify(cls, comment, user_mode=False):
 
         if "text" not in comment:
             return False, "text is missing"
@@ -120,7 +122,7 @@ class API(object):
         if not isinstance(comment.get("parent"), (int, type(None))):
             return False, "parent must be an integer or null"
 
-        for key in ("text", "author", "website", "email"):
+        for key in ("text", "author", "website", "email", "password"):
             if not isinstance(comment.get(key), (str, type(None))):
                 return False, "%s must be a string or null" % key
 
@@ -132,6 +134,9 @@ class API(object):
 
         if len(comment.get("email") or "") > 254:
             return False, "http://tools.ietf.org/html/rfc5321#section-4.5.3"
+
+        if not user_mode and "@" not in (comment.get("email") or ""):
+            return False, "Invalid email address (must contain @)"
 
         if comment.get("website"):
             if len(comment["website"]) > 254:
@@ -150,12 +155,19 @@ class API(object):
         for field in set(data.keys()) - API.ACCEPT:
             data.pop(field)
 
-        for key in ("author", "email", "website", "parent"):
+        for key in ("author", "password", "email", "website", "parent"):
             data.setdefault(key, None)
 
-        valid, reason = API.verify(data)
+        user = next((user for user in self.users if user[0] == data["author"]), None)
+
+        valid, reason = API.verify(data, user_mode=user is not None)
         if not valid:
             return BadRequest(reason)
+
+        if user:
+            if user[1] != data["password"]:
+                return Unauthorized("Invalid password")
+            data["email"] = "isso-user-" + user[0] # Intentionally no @, so anons can't spoof this
 
         for field in ("author", "email", "website"):
             if data.get(field) is not None:

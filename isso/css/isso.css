@@ -18,6 +18,8 @@
 #isso-thread .textarea {
     min-height: 58px;
     outline: 0;
+    -webkit-transition: border-color 0.3s, color 0.3s;
+    transition: border-color 0.3s, color 0.3s;
 }
 #isso-thread .textarea.placeholder {
     color: #AAA;
@@ -184,6 +186,8 @@
     line-height: 1.4em;
     border: 1px solid rgba(0, 0, 0, 0.2);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    -webkit-transition: border-color 0.3s, color 0.3s;
+    transition: border-color 0.3s, color 0.3s;
 }
 .isso-postbox > .form-wrapper > .auth-section .post-action {
     display: inline-block;
@@ -205,6 +209,20 @@
 }
 .isso-postbox > .form-wrapper > .auth-section .post-action > input:active {
     background-color: #BBB;
+}
+.isso-postbox > .form-wrapper > .auth-section .input-wrapper-password {
+    display: none;
+}
+.isso-postbox.isso-postbox-password-mode > .form-wrapper > .auth-section .input-wrapper-password {
+    display: inline-block;
+}
+.isso-postbox.isso-postbox-password-mode > .form-wrapper > .auth-section .input-wrapper-email {
+    display: none;
+}
+.textarea.has-error,
+.isso-postbox > .form-wrapper > .auth-section input.has-error {
+    border-color: red!important;
+    color: red;
 }
 @media screen and (max-width:600px) {
     .isso-postbox > .form-wrapper > .auth-section .input-wrapper {
