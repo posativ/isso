@@ -147,6 +147,8 @@ test("should fill Postbox with valid data and receive 201 reply", async () => {
   const elm = await thread.evaluate((node) => node.innerHTML);
   await expect(elm.replace(/<time.*?>/, '<time>'))
     .toMatchSnapshot();
+  
+  await expect(page).not.toMatchElement('.isso-post-action > [type=submit]:disabled');
 
   await page.waitForSelector('#isso-1 > .isso-text-wrapper > .isso-comment-footer > .isso-edit');
 
@@ -263,4 +265,33 @@ test("should execute GET/PUT/POST/DELETE requests correctly", async () => {
     '#isso-1 .isso-text',
     { text: 'New comment body' },
   );
+});
+
+test("Postbox submit button should be disabled on submit click and enabled after response", async () => {
+  // Fill the textarea with the comment
+  await expect(page).toFill(
+      '.isso-textarea',
+      'A comment with *italics* and [a link](http://link.com)'
+  );
+
+  // Intercept the request to the ISSO endpoint
+  await page.setRequestInterception(true);
+  const submitButtonSelector = '.isso-post-action > [type=submit]';
+  let createHandler = async (request) => {
+    if (request.url().startsWith(ISSO_ENDPOINT + '/new')) {
+      await expect(page).toMatchElement(submitButtonSelector + ":disabled");
+      request.abort();
+      await expect(page).not.toMatchElement(submitButtonSelector + ":disabled");
+    } else {
+      request.continue();
+    }
+  };
+  await page.on('request', createHandler);
+
+  // Click the submit button
+  await expect(page).toClick(submitButtonSelector);
+
+  // Disable request interception and remove the request handler
+  page.setRequestInterception(false);
+  page.off('request', createHandler);
 });
